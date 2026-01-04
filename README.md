@@ -1,8 +1,8 @@
 # az_mqtt_broker
 
-## MQTT Broker Implementation in C++20
-
 This project is a lightweight MQTT broker built in C++20, using native sockets and threads. It was designed to support all the main features of an MQTT broker:
+
+## Features:
 
 - Native TCP socket handling for client connections.
 - Thread pools for concurrent message processing and outbound delivery.
@@ -12,12 +12,13 @@ This project is a lightweight MQTT broker built in C++20, using native sockets a
 - Extensible design following a modular architecture (ConnectMgr, WorkerPool, OutboundPool, DbMgr, etc.).
 
 ## Architecture
-The broker is structured around:
 
 - MqttListener: accepts client connections and dispatches incoming packets.
 - WorkerPool / WorkerTask: processes inbound messages and applies protocol logic.
 - OutboundPool / OutboundTask: manages per-client queues and sends messages to subscribers.
 - DbMgr: stores client sessions, subscriptions, and pending messages.
 - MqttProtocolHandler: parses and processes MQTT commands.
+
+![uml](img/az_mqtt_broker.png)
 
 Currently, it is an ongoing project, in its first preliminary version.

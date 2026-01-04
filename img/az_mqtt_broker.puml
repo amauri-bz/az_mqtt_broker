@@ -1,0 +1,160 @@
+@startuml
+
+interface ConnectIntf {
+    + init_socket()
+    + send()
+    + receive()
+}
+
+interface DbIntf {
+    + create()
+    + read()
+    + update()
+    + delete()
+}
+
+interface ThreadPoolIntf {
+    + enqueue()
+    + enqueue(clientId : std::string)
+}
+
+struct MqttPacketContext {
+    + raw_data : std::vector<char>
+    + clientId : std::string
+}
+
+struct Subscription { 
+    + topicFilter : std::string
+    + qos : int
+}
+
+struct ClientQueue {
+    + clientId : std::string
+    + maxSize : size_t
+    + enqueue(msg : MqttPacketContext)
+    + dequeue() : MqttPacketContext
+}
+
+struct PendingMessage {
+    + messageId : int
+    + qos : int
+    + state : std::string // PENDING, ACKED, RETRANSMIT
+}
+
+class PendingMessageStore {
+    + addPending(clientId : std::string, msg : PendingMessage)
+    + ackReceived(clientId : std::string, messageId : int)
+    + retransmit(clientId : std::string)
+    - pending : std::map<std::string, std::vector<PendingMessage>>
+}
+
+struct ClientSession { 
+    + clientId : std::string
+    + socket : int 
+    + cleanSession : bool 
+    + subscriptions : std::vector<Subscription>
+    + queue : ClientQueue
+}
+
+class ConnectMgr {
+    + init_socket()
+    + send()
+    + receive()
+}
+
+class WorkerPool {
+    + enqueue()
+    + worker_loop()
+    - workers : vector<std::thread>
+    - connectMgr : ConnectMgr
+    - outboundPool : OutboundPool
+    - dbMgr : DbMgr
+}
+
+class WorkerTask {
+    + worker_loop()
+    - connectMgr : ConnectMgr
+    - outboundPool : OutboundPool
+    - context : MqttPacketContext
+    - dbMgr : DbMgr
+}
+
+class OutboundPool {
+    + enqueue(clientId : std::string)
+    + worker_loop()
+    - workers : vector<std::thread>
+    - connectMgr : ConnectMgr
+    - dbMgr : DbMgr
+}
+
+class OutboundTask {
+    + worker_loop()
+    - connectMgr : ConnectMgr
+    - context : MqttPacketContext
+    - dbMgr : DbMgr
+}
+
+class DbMgr {
+    + create()
+    + read()
+    + update()
+    + delete()
+    - clientSessions : std::map<std::string, ClientSession>
+    - pendingStore : PendingMessageStore
+}
+
+class MqttListener {
+    + run_loop()
+    - listener_thread : std::thread
+    - connectMgr : ConnectMgr
+    - workerPool : WorkerPool
+    - outboundPool : OutboundPool
+    - dbMgr : DbMgr
+    - context : MqttPacketContext
+}
+
+class MqttProtocolHandler {
+    + process_sub()
+    + process_pub()
+    - dump_msg()
+}
+
+class Main {
+    - connectMgr : ConnectMgr
+    - workerPool : WorkerPool
+    - outboundPool : OutboundPool
+    - dbMgr : DbMgr
+    - mqttListener : MqttListener
+    + main()
+}
+
+Main *-- ConnectMgr
+Main *-- WorkerPool
+Main *-- OutboundPool
+Main *-- DbMgr
+Main *-- MqttListener
+
+WorkerPool..|> ThreadPoolIntf
+OutboundPool..|> ThreadPoolIntf
+ConnectMgr..|> ConnectIntf
+DbMgr ..|> DbIntf
+
+WorkerPool o-- WorkerTask
+OutboundPool o-- OutboundTask
+
+ClientSession o-- Subscription
+ClientSession o-- ClientQueue
+DbMgr o-- PendingMessageStore
+PendingMessageStore o-- PendingMessage
+
+WorkerTask --> DbIntf : use create/read/update/delete
+OutboundTask --> ConnectIntf : use send
+OutboundTask --> DbIntf : use read/update/delete
+WorkerTask --> MqttProtocolHandler : use process_sub/process_pub
+WorkerTask --> ThreadPoolIntf : use enqueue(lambda{context, DbIntf})
+MqttListener --> ConnectIntf : use receive
+MqttListener --> ThreadPoolIntf : use enqueue(lambda{context, outboundTask, DbIntf})
+OutboundPool --> ClientQueue : consume messages
+
+@enduml
+
