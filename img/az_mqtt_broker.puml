@@ -1,160 +1,91 @@
 @startuml
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
 
 interface ConnectIntf {
-    + init_socket()
-    + send()
-    + receive()
+    + watch_events() : void
+    + send(clientId : string, data : span<char>) : bool
+    + receive(socket : int) : MqttPacketContext
 }
 
 interface DbIntf {
-    + create()
-    + read()
-    + update()
-    + delete()
+    + get_session(clientId : string) : shared_ptr<ClientSession>
+    + save_session(session : ClientSession) : void
+    + get_pending_store() : PendingMessageStore&
 }
 
 interface ThreadPoolIntf {
-    + enqueue()
-    + enqueue(clientId : std::string)
+    + enqueue(task : function<void()>) : void
 }
 
 struct MqttPacketContext {
-    + raw_data : std::vector<char>
-    + clientId : std::string
+    + raw_data : shared_ptr<vector<char>>
+    + clientId : string
+    + socket_fd : int
 }
 
-struct Subscription { 
-    + topicFilter : std::string
-    + qos : int
+class ClientQueue {
+    - mtx : std::mutex
+    - cv : std::condition_variable
+    - messages : std::queue<MqttPacketContext>
+    + push(msg : MqttPacketContext) : void
+    + pop_wait() : MqttPacketContext
 }
 
-struct ClientQueue {
-    + clientId : std::string
-    + maxSize : size_t
-    + enqueue(msg : MqttPacketContext)
-    + dequeue() : MqttPacketContext
-}
-
-struct PendingMessage {
-    + messageId : int
-    + qos : int
-    + state : std::string // PENDING, ACKED, RETRANSMIT
-}
-
-class PendingMessageStore {
-    + addPending(clientId : std::string, msg : PendingMessage)
-    + ackReceived(clientId : std::string, messageId : int)
-    + retransmit(clientId : std::string)
-    - pending : std::map<std::string, std::vector<PendingMessage>>
-}
-
-struct ClientSession { 
-    + clientId : std::string
-    + socket : int 
-    + cleanSession : bool 
-    + subscriptions : std::vector<Subscription>
+class ClientSession {
+    + clientId : string
+    + socket_fd : int
     + queue : ClientQueue
-}
-
-class ConnectMgr {
-    + init_socket()
-    + send()
-    + receive()
-}
-
-class WorkerPool {
-    + enqueue()
-    + worker_loop()
-    - workers : vector<std::thread>
-    - connectMgr : ConnectMgr
-    - outboundPool : OutboundPool
-    - dbMgr : DbMgr
-}
-
-class WorkerTask {
-    + worker_loop()
-    - connectMgr : ConnectMgr
-    - outboundPool : OutboundPool
-    - context : MqttPacketContext
-    - dbMgr : DbMgr
-}
-
-class OutboundPool {
-    + enqueue(clientId : std::string)
-    + worker_loop()
-    - workers : vector<std::thread>
-    - connectMgr : ConnectMgr
-    - dbMgr : DbMgr
-}
-
-class OutboundTask {
-    + worker_loop()
-    - connectMgr : ConnectMgr
-    - context : MqttPacketContext
-    - dbMgr : DbMgr
+    + subscriptions : vector<Subscription>
 }
 
 class DbMgr {
-    + create()
-    + read()
-    + update()
-    + delete()
-    - clientSessions : std::map<std::string, ClientSession>
-    - pendingStore : PendingMessageStore
+    - sessions : std::unordered_map<string, shared_ptr<ClientSession>>
+    - sessions_mtx : std::shared_mutex
+    + get_session(clientId) : shared_ptr<ClientSession>
+}
+
+class WorkerPool {
+    - workers : vector<jthread>
+    - task_queue : Queue<function<void()>>
+    + enqueue(task) : void
+}
+
+class OutboundPool {
+    - workers : vector<jthread>
+    + watch_session(clientId : string) : void
 }
 
 class MqttListener {
-    + run_loop()
-    - listener_thread : std::thread
-    - connectMgr : ConnectMgr
-    - workerPool : WorkerPool
-    - outboundPool : OutboundPool
-    - dbMgr : DbMgr
-    - context : MqttPacketContext
+    - connectMgr : ConnectIntf
+    - workerPool : ThreadPoolIntf
+    - dbMgr : DbIntf
+    + run_loop() // Usa epoll_wait / watch_events
 }
 
 class MqttProtocolHandler {
-    + process_sub()
-    + process_pub()
-    - dump_msg()
+    + static handle(context : MqttPacketContext, db : DbIntf) : void
 }
 
-class Main {
-    - connectMgr : ConnectMgr
-    - workerPool : WorkerPool
-    - outboundPool : OutboundPool
-    - dbMgr : DbMgr
-    - mqttListener : MqttListener
-    + main()
-}
-
+' Relações
 Main *-- ConnectMgr
 Main *-- WorkerPool
 Main *-- OutboundPool
 Main *-- DbMgr
 Main *-- MqttListener
 
-WorkerPool..|> ThreadPoolIntf
-OutboundPool..|> ThreadPoolIntf
-ConnectMgr..|> ConnectIntf
+ConnectMgr ..|> ConnectIntf
 DbMgr ..|> DbIntf
+WorkerPool ..|> ThreadPoolIntf
+OutboundPool ..|> ThreadPoolIntf
 
-WorkerPool o-- WorkerTask
-OutboundPool o-- OutboundTask
-
-ClientSession o-- Subscription
-ClientSession o-- ClientQueue
-DbMgr o-- PendingMessageStore
-PendingMessageStore o-- PendingMessage
-
-WorkerTask --> DbIntf : use create/read/update/delete
-OutboundTask --> ConnectIntf : use send
-OutboundTask --> DbIntf : use read/update/delete
-WorkerTask --> MqttProtocolHandler : use process_sub/process_pub
-WorkerTask --> ThreadPoolIntf : use enqueue(lambda{context, DbIntf})
-MqttListener --> ConnectIntf : use receive
-MqttListener --> ThreadPoolIntf : use enqueue(lambda{context, outboundTask, DbIntf})
-OutboundPool --> ClientQueue : consume messages
+MqttListener --> ConnectIntf : listen
+MqttListener --> WorkerPool : dispatch task
+WorkerPool ..> MqttProtocolHandler : invoke
+MqttProtocolHandler --> DbIntf : update state
+DbIntf o-- ClientSession
+ClientSession *-- ClientQueue
+OutboundPool --> DbIntf : monitor queues
+OutboundPool --> ConnectIntf : send data
 
 @enduml
-
