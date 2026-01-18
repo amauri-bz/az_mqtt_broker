@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <memory>
 #include "../include/az_connect_intf.hpp"
 
 namespace AzMqttBroker {
@@ -18,8 +19,9 @@ public:
     void set_nonblocking(int fd) override;
     void add_socket(int fd) override;
     std::vector<int> wait_for_events() override;
-    int setup_server_socket(int port);
-    int accept_socket(int fd);
+    int setup_server_socket(int port) override;
+    int accept_socket(int fd) override;
+    ssize_t socket_recv(int fd, std::shared_ptr<std::vector<char>> buffer);
 };
 }
 

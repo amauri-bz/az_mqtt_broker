@@ -7,6 +7,8 @@ namespace AzMqttBroker {
 void MqttBroker::start() {
     try {
         auto connectMgr = std::make_shared<ConnectMgr>();
+        //auto dbMgr = std::make_shared<DbMgr>();
+        auto workerPool = std::make_shared<WorkerPool>(8); // 8 threads
 
         int server_fd = connectMgr->setup_server_socket(1883);
 
@@ -14,7 +16,7 @@ void MqttBroker::start() {
 
         connectMgr->add_socket(server_fd);
 
-        MqttListener listener(connectMgr, server_fd);
+        MqttListener listener(connectMgr, workerPool, /*dbMgr,*/ server_fd);
         listener.run_loop();
 
     } catch (const std::exception& e) {

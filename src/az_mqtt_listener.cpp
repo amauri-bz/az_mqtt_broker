@@ -9,10 +9,11 @@ MqttListener::~MqttListener() {
     running = false;
 }
 
-MqttListener::MqttListener(std::shared_ptr<ConnectMgr> conn, int fd) {
+MqttListener::MqttListener(std::shared_ptr<ConnectIntf> conn, std::shared_ptr<ThreadPoolIntf> poll, int fd) {
     running = true;
     connectMgr = conn;
     server_fd = fd;
+    workerPool = poll;
 }
 
 void MqttListener::run_loop() {
@@ -28,6 +29,16 @@ void MqttListener::run_loop() {
                 }
             } else {
                 std::cout << "Client Message\n";
+                workerPool->enqueue([this, fd]() {
+                    auto buffer = std::make_shared<std::vector<char>>(2048);
+                    ssize_t bytes_read = connectMgr->socket_recv(fd, buffer);
+
+                    if (bytes_read > 0) {
+                        std::cout << "Client Message bytes:" << static_cast<int>(bytes_read) << "\n";
+                    } else if (bytes_read == 0) {
+                        //Disconnection handler
+                    }
+                });
             }
         }
     }
