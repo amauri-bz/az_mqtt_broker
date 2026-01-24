@@ -21,7 +21,8 @@ public:
     std::vector<int> wait_for_events() override;
     int setup_server_socket(int port) override;
     int accept_socket(int fd) override;
-    ssize_t socket_recv(int fd, std::shared_ptr<std::vector<char>> buffer);
+    ssize_t socket_recv(int fd, std::shared_ptr<std::vector<char>> buffer)  override;
+    ssize_t socket_send(int fd, std::shared_ptr<std::vector<char>> buffer) override;
 };
 }
 

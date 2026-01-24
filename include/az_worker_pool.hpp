@@ -5,11 +5,11 @@
 #include <condition_variable>
 #include <functional>
 
-#include "az_thread_pool_intf.hpp"
+#include "az_worker_pool_intf.hpp"
 
 namespace AzMqttBroker {
 
-class WorkerPool : public ThreadPoolIntf {
+class WorkerPool : public WorkerPoolIntf {
 private:
     std::vector<std::jthread> workers;
     std::queue<std::function<void()>> tasks;

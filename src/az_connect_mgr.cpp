@@ -97,4 +97,8 @@ ssize_t ConnectMgr::socket_recv(int fd, std::shared_ptr<std::vector<char>> buffe
     return recv(fd, buffer->data(), buffer->size(), 0);
 }
 
+ssize_t ConnectMgr::socket_send(int fd, std::shared_ptr<std::vector<char>> buffer) {
+    return send(fd, buffer->data(), buffer->size(), 0);
+}
+
 }
