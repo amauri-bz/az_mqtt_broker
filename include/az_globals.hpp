@@ -31,7 +31,7 @@ struct FixedHeader {
     MqttPacketType type;
     uint8_t flags;
     size_t remainingLength;
-    size_t headerSize; // Quantos bytes o cabeçalho fixo ocupou
+    size_t headerSize;
 };
 
 class ClientQueue {
