@@ -28,7 +28,8 @@ public:
     static void process_publish(MqttPacketContext& ctx,
                                           std::span<const char> payload,
                                           std::shared_ptr<DbIntf> dbMgr,
-                                          std::shared_ptr<OutboundPoolIntf> outboundPool);
+                                          std::shared_ptr<OutboundPoolIntf> outboundPool,
+                                          uint8_t fixedHeaderFlags=0);
 
     static std::string read_mqtt_string(std::span<const char>& data);
 

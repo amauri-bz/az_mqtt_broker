@@ -108,19 +108,18 @@ void MqttProtocolHandler::process_connect(MqttPacketContext& ctx,
 void MqttProtocolHandler::process_publish(MqttPacketContext& ctx,
                                           std::span<const char> payload,
                                           std::shared_ptr<DbIntf> dbMgr,
-                                          std::shared_ptr<OutboundPoolIntf> outboundPool) {
+                                          std::shared_ptr<OutboundPoolIntf> outboundPool,
+                                          uint8_t fixedHeaderFlags) {
     auto data = payload;
 
     // Extracting the prot name
     std::string topic = read_mqtt_string(data);
 
     // Extracting the Packet Identifier (2 bytes)
-    uint8_t flags = data[0];
-    uint8_t qos = (flags >> 1) & 0x03;
-    uint16_t packetId = 0;
+    uint8_t qos = (fixedHeaderFlags >> 1) & 0x03;
     if (qos > 0) {
         if (data.size() < 2) return;
-        packetId = (static_cast<uint8_t>(data[0]) << 8) | static_cast<uint8_t>(data[1]);
+        // Avançamos 2 bytes apenas se realmente houver um Packet ID
         data = data.subspan(2);
     }
 
@@ -145,8 +144,13 @@ void MqttProtocolHandler::process_publish(MqttPacketContext& ctx,
     auto subscribers = dbMgr->get_subscribers_for_topic(topic);
 
     for (const auto& subId : subscribers) {
+
         auto subSession = dbMgr->get_session(subId);
         if (subSession) {
+
+            if (subSession->socket_fd == ctx.socket_fd)
+                continue;
+
             std::cout << "process_publish Session: " << subSession->clientId << " Topic:" << topic << "\n";
             MqttPacketContext outCtx;
             outCtx.raw_data = std::make_shared<std::vector<char>>(packet.begin(), packet.end());
@@ -254,7 +258,7 @@ void MqttProtocolHandler::handle(MqttPacketContext& ctx,
             break;
         case MqttPacketType::PUBLISH:
             std::cout << "MQTT protocol handler: PUBLISH\n";
-            process_publish(ctx, payload, dbMgr, outPool);
+            process_publish(ctx, payload, dbMgr, outPool, header->flags);
             break;
         case MqttPacketType::SUBSCRIBE:
             std::cout << "MQTT protocol handler: SUBSCRIBE\n";
