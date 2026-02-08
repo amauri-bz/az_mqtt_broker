@@ -62,6 +62,8 @@ void OutboundPool::process_client_delivery(const std::string& clientId) {
         auto msg_opt = session->queue.try_pop();
         if (!msg_opt) break;
 
+        print_hex_buffer(*msg_opt->raw_data, "process_client_delivery>> ");
+
         connectMgr->socket_send(session->socket_fd, msg_opt->raw_data);
     }
 }

@@ -6,6 +6,16 @@
 #include <queue>
 #include <optional>
 #include <condition_variable>
+#include <set>
+#include <unordered_map>
+
+#include <iostream>
+#include <arpa/inet.h>
+#include <iomanip>
+#include <variant>
+#include <cstdint>
+#include <optional>
+
 
 namespace AzMqttBroker
 {
@@ -70,5 +80,39 @@ struct ClientSession {
     int socket_fd;
     ClientQueue queue;
 };
+
+struct TopicNode {
+    // Clients at this level
+    std::set<std::string> subscribers;
+
+    // Sub-level (child)
+    std::unordered_map<std::string, std::unique_ptr<TopicNode>> children;
+};
+
+/**
+ * @brief Prints the contents of any byte container (vector or array) in hexadecimal format.
+ * @param buffer The byte container (vector or array).
+ * @param separator The separator to be used between the bytes (e.g., " " or "").
+ */
+template <typename Container>
+inline void print_hex_buffer(const Container& buffer, const std::string& message = " ", const std::string& separator = " ") {
+    std::ios state(nullptr);
+    state.copyfmt(std::cout);
+
+    std::cout << message << "Buffer Hex [" << buffer.size() << " bytes]: ";
+
+    std::cout << std::hex << std::uppercase << std::setfill('0');
+
+    for (const auto& byte : buffer) {
+        std::cout << std::setw(2)
+                << static_cast<unsigned int>(static_cast<unsigned char>(byte))
+                << separator;
+    }
+
+    std::cout << "\n";
+
+    std::cout.copyfmt(state);
+}
+
 
 }

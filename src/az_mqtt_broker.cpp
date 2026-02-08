@@ -16,8 +16,6 @@ void MqttBroker::start() {
 
         int server_fd = connectMgr->setup_server_socket(1883);
 
-        std::cout << "New socket:" << server_fd << "\n";
-
         connectMgr->add_socket(server_fd);
 
         MqttListener listener(connectMgr, workerPool, dbMgr, server_fd, OutPool);

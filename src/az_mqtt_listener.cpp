@@ -37,13 +37,11 @@ void MqttListener::run_loop() {
                     connectMgr->add_socket(client_fd);
                 }
             } else {
-                std::cout << "Client Message\n";
                 workerPool->enqueue([this, fd]() {
                     auto buffer = std::make_shared<std::vector<char>>(2048);
                     ssize_t bytes_read = connectMgr->socket_recv(fd, buffer);
 
                     if (bytes_read > 0) {
-                        std::cout << "Client Message bytes:" << static_cast<int>(bytes_read) << "\n";
                         buffer->resize(bytes_read);
                         MqttPacketContext ctx{ .raw_data = buffer, .socket_fd = fd };
                         MqttProtocolHandler::handle(ctx, dbMgr, OutPool);
